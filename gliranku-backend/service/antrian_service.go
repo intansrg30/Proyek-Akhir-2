@@ -110,12 +110,12 @@ func (s *antrianService) CreateAntrian(req request.AntrianRequest) (*response.An
 		return nil, fmt.Errorf("pendaftaran antrian hanya tersedia pada jam operasional (08:00 - 16:00 WIB)")
 	}
 
-	hasActive, err := s.repo.HasActiveAntrianToday(req.NIK, tanggal)
+	hasActive, err := s.repo.HasActiveAntrianInPoli(req.NIK, tanggal, req.PoliID)
 	if err != nil {
 		return nil, fmt.Errorf("gagal memeriksa antrian aktif: %w", err)
 	}
 	if hasActive {
-		return nil, fmt.Errorf("Anda sudah memiliki antrian aktif pada hari ini")
+		return nil, fmt.Errorf("Anda sudah mengambil antrian ke poli ini pada hari ini")
 	}
 
 	if req.DokterID != nil {
@@ -124,7 +124,7 @@ func (s *antrianService) CreateAntrian(req request.AntrianRequest) (*response.An
 		if err != nil {
 			return nil, fmt.Errorf("gagal memeriksa status dokter: %w", err)
 		}
-		if docStatus != "hadir" {
+		if strings.ToLower(docStatus) != "hadir" {
 			return nil, fmt.Errorf("dokter tidak tersedia pada tanggal tersebut (status: %s)", docStatus)
 		}
 		remaining, err := s.repo.GetRemainingQuotaOnDate(*req.DokterID, tanggalStr)
@@ -347,12 +347,24 @@ func (s *antrianService) CreateBpjsAntrian(req request.BpjsAntrianRequest) (*res
 		return nil, fmt.Errorf("pendaftaran antrian hanya tersedia pada jam operasional (08:00 - 16:00 WIB)")
 	}
 
-	hasActiveBpjs, errCheck := s.repo.HasActiveAntrianToday(req.NIK, time.Now())
-	if errCheck != nil {
-		return nil, fmt.Errorf("gagal memeriksa antrian aktif: %w", errCheck)
-	}
-	if hasActiveBpjs {
-		return nil, fmt.Errorf("Anda sudah memiliki antrian aktif pada hari ini")
+	tanggal := time.Now()
+
+	if req.DokterID != nil {
+		tanggalStr := tanggal.Format("2006-01-02")
+		docStatus, err := s.repo.GetDoctorStatusOnDate(*req.DokterID, tanggalStr)
+		if err != nil {
+			return nil, fmt.Errorf("gagal memeriksa status dokter: %w", err)
+		}
+		if strings.ToLower(docStatus) != "hadir" {
+			return nil, fmt.Errorf("dokter tidak tersedia pada hari ini (status: %s)", docStatus)
+		}
+		remaining, err := s.repo.GetRemainingQuotaOnDate(*req.DokterID, tanggalStr)
+		if err != nil {
+			return nil, fmt.Errorf("gagal memeriksa sisa kuota dokter: %w", err)
+		}
+		if remaining <= 0 {
+			return nil, fmt.Errorf("kuota pendaftaran dokter tersebut pada hari ini sudah habis")
+		}
 	}
 
 	const bpjsApiKey = ""
@@ -451,7 +463,15 @@ func (s *antrianService) CreateBpjsAntrian(req request.BpjsAntrianRequest) (*res
 		}
 	}
 
-	tanggal := time.Now()
+	hasActiveBpjs, errCheck := s.repo.HasActiveAntrianInPoli(req.NIK, tanggal, poliID)
+	if errCheck != nil {
+		return nil, fmt.Errorf("gagal memeriksa antrian aktif: %w", errCheck)
+	}
+	if hasActiveBpjs {
+		return nil, fmt.Errorf("Anda sudah mengambil antrian ke poli ini pada hari ini")
+	}
+
+	// tanggal is already defined above
 
 	lastGlobal, err := s.repo.GetLastQueueNumberGlobal(tanggal)
 	if err != nil {

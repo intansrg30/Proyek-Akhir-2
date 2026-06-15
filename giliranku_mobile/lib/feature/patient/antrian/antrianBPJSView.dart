@@ -210,11 +210,12 @@ class _AntrianBpjsViewState extends State<AntrianBpjsView>
     ));
   }
 
-  void _showSnack(String msg) {
+  void _showSnack(String msg, {bool isError = true}) {
+    msg = msg.replaceAll('Exception: ', '');
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
       behavior: SnackBarBehavior.floating,
-      backgroundColor: const Color(0xFF0D9B86),
+      backgroundColor: isError ? Colors.red.shade600 : const Color(0xFF0D9B86),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.all(16),
     ));

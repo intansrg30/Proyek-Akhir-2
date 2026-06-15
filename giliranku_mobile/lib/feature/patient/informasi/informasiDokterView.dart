@@ -37,10 +37,22 @@ class _InformasiDokterPageState extends State<InformasiDokterPage> {
   Future<void> _fetchData() async {
     setState(() { _isLoading = true; _isError = false; });
     try {
-      final data = await ApiDataSource().fetchDokterByPoly(null);
+      final polis = await ApiDataSource().fetchPoliklinik();
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      
+      List<Map<String, dynamic>> allDocs = [];
+      if (polis.isNotEmpty) {
+        final results = await Future.wait(
+          polis.map((p) => ApiDataSource().fetchDokterByPoly(p['poly_id'] ?? p['id'], today).catchError((_) => <Map<String, dynamic>>[]))
+        );
+        allDocs = results.expand((x) => x).toList();
+      } else {
+        allDocs = await ApiDataSource().fetchDokterByPoly(null);
+      }
+
       if (mounted) {
         setState(() {
-          _allDoctors = data;
+          _allDoctors = allDocs;
           _isLoading = false;
           _applyFilters();
         });
@@ -210,6 +222,8 @@ class _InformasiDokterPageState extends State<InformasiDokterPage> {
     final dayKey = _days[_selectedDayIndex]['key']!;
     final String time = (doctor[dayKey] ?? '').toString().trim();
     final int kuota = int.tryParse('${doctor['kuota_non_jkn'] ?? 0}') ?? 0;
+    final String statusInfo = (doctor['status_info'] ?? 'hadir').toString();
+    final bool isHadir = statusInfo.toLowerCase() == 'hadir';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -254,8 +268,8 @@ class _InformasiDokterPageState extends State<InformasiDokterPage> {
                     Container(
                       width: 10,
                       height: 10,
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
+                      decoration: BoxDecoration(
+                        color: isHadir ? Colors.green : Colors.red,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -289,6 +303,22 @@ class _InformasiDokterPageState extends State<InformasiDokterPage> {
                         'Sisa kuota: $kuota',
                         style: TextStyle(
                           color: kuota < 10 ? AppColors.warning : Colors.green,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: isHadir ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        statusInfo.toUpperCase(),
+                        style: TextStyle(
+                          color: isHadir ? Colors.green : Colors.red,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),

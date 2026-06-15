@@ -27,7 +27,7 @@ type AntrianRepository interface {
 	GetDoctorNameByID(doctorID int) (string, error)
 	DeleteAntrian(kodeBooking string) error
 	IncrementPrintCount(kodeBooking string) error
-	HasActiveAntrianToday(nik string, tanggal time.Time) (bool, error)
+	HasActiveAntrianInPoli(nik string, tanggal time.Time, poliID int) (bool, error)
 	GetDoctorStatusOnDate(dokterID int, tanggal string) (string, error)
 	GetRemainingQuotaOnDate(dokterID int, tanggal string) (int, error)
 }
@@ -397,7 +397,7 @@ func (r *antrianRepository) IncrementPrintCount(kodeBooking string) error {
 	return err
 }
 
-func (r *antrianRepository) HasActiveAntrianToday(nik string, tanggal time.Time) (bool, error) {
+func (r *antrianRepository) HasActiveAntrianInPoli(nik string, tanggal time.Time, poliID int) (bool, error) {
 	dateStr := tanggal.Format("2006-01-02")
 	var count int
 	err := r.db.QueryRow(`
@@ -405,8 +405,9 @@ func (r *antrianRepository) HasActiveAntrianToday(nik string, tanggal time.Time)
 		WHERE nik = $1
 		  AND tanggal >= $2::date
 		  AND tanggal < ($2::date + interval '1 day')
+		  AND poli_id = $3
 		  AND status != 'dibatalkan'
-	`, nik, dateStr).Scan(&count)
+	`, nik, dateStr, poliID).Scan(&count)
 	if err != nil {
 		return false, err
 	}

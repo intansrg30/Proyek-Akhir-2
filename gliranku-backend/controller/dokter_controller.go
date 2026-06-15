@@ -23,12 +23,17 @@ func NewDokterController(repo *repository.DokterRepository, svc *service.DokterS
 }
 
 func (ctrl *DokterController) GetByPoly(c *gin.Context) {
+	tanggal := c.Query("tanggal")
+	if tanggal == "" {
+		tanggal = time.Now().Format("2006-01-02")
+	}
+
 	polyIDStr := c.Query("poly_id")
 	if polyIDStr == "" {
 		polyIDStr = c.Param("poly_id")
 	}
 	if polyIDStr == "" {
-		results, err := ctrl.Repo.FindAll()
+		results, err := ctrl.Repo.FindAll(tanggal)
 		if err != nil {
 			utils.Error(c, http.StatusInternalServerError, "Gagal mengambil data dokter")
 			return
@@ -41,11 +46,6 @@ func (ctrl *DokterController) GetByPoly(c *gin.Context) {
 	if err != nil {
 		utils.Error(c, http.StatusBadRequest, "Parameter poly_id harus berupa angka")
 		return
-	}
-
-	tanggal := c.Query("tanggal")
-	if tanggal == "" {
-		tanggal = time.Now().Format("2006-01-02")
 	}
 
 	results, err := ctrl.Repo.FindByPolyID(polyID, tanggal)

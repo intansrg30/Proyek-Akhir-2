@@ -68,21 +68,23 @@ func (r *DokterRepository) FindByPolyID(polyID int, tanggal string) ([]models.Do
 	return results, nil
 }
 
-func (r *DokterRepository) FindAll() ([]models.Dokter, error) {
+func (r *DokterRepository) FindAll(tanggal string) ([]models.Dokter, error) {
 	query := `
 		SELECT c.id as category_id, c.namadokter, c."IdPoli", p."NamaPoli", d."NoTelp", d."Spesialisasi", s.nama, c.options as schedule,
 		       COALESCE(c.senin,''), COALESCE(c.selasa,''), COALESCE(c.rabu,''),
 		       COALESCE(c.kamis,''), COALESCE(c.jumat,''), COALESCE(c.sabtu,''), COALESCE(c.minggu,''),
-		       COALESCE(c."KuotaNonJKN", 0), COALESCE(c."KuotaNonJKN", 30)
+		       (COALESCE(sk.kuota_custom, c."KuotaNonJKN", 30) - (SELECT COUNT(*) FROM antrian a WHERE a.dokter_id = c.id AND DATE(a.tanggal) = $1::date AND status != 'dibatalkan')), COALESCE(sk.kuota_custom, c."KuotaNonJKN", 30),
+		       COALESCE(sk.status, 'hadir'), COALESCE(sk.keterangan, '')
 		FROM category c
 		JOIN tbpoli p ON c."IdPoli" = p."IdPoli"
 		LEFT JOIN tbdaftardokter d ON c."IdDokter" = d."IdDokter"
 		LEFT JOIN tbspesialis s ON d."Spesialisasi" = s.id
+		LEFT JOIN status_dokter sk ON sk.dokter_id = c.id AND sk.tanggal = $1::date
 		WHERE c.app = 1
 		ORDER BY c.namadokter ASC
 	`
 
-	rows, err := r.DB.Query(query)
+	rows, err := r.DB.Query(query, tanggal)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +100,8 @@ func (r *DokterRepository) FindAll() ([]models.Dokter, error) {
 		var spesialisasiNama sql.NullString
 
 		err := rows.Scan(&d.DoctorID, &d.DoctorName, &d.PolyID, &d.PolyName, &telp, &spesialisasi, &spesialisasiNama, &schedule,
-			&d.Senin, &d.Selasa, &d.Rabu, &d.Kamis, &d.Jumat, &d.Sabtu, &d.Minggu, &d.KuotaNonJKN, &d.MaxKuotaNonJKN)
+			&d.Senin, &d.Selasa, &d.Rabu, &d.Kamis, &d.Jumat, &d.Sabtu, &d.Minggu, &d.KuotaNonJKN, &d.MaxKuotaNonJKN,
+			&d.StatusInfo, &d.StatusKeterangan)
 		if err != nil {
 			return nil, err
 		}
