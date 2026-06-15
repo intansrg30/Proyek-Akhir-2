@@ -111,8 +111,10 @@ type statusKhususRequest struct {
 	DokterID    int    `json:"dokter_id" binding:"required"`
 	Tanggal     string `json:"tanggal" binding:"required"`
 	Status      string `json:"status" binding:"required"`
-	Keterangan  string `json:"keterangan"`
-	KuotaCustom *int   `json:"kuota_custom"`
+	Keterangan   string  `json:"keterangan"`
+	KuotaCustom  *int    `json:"kuota_custom"`
+	WaktuMulai   *string `json:"waktu_mulai"`
+	WaktuSelesai *string `json:"waktu_selesai"`
 }
 
 func (ctrl *DokterController) SetStatusKhusus(c *gin.Context) {
@@ -125,9 +127,11 @@ func (ctrl *DokterController) SetStatusKhusus(c *gin.Context) {
 	sk := &models.DokterStatusKhusus{
 		DokterID:    req.DokterID,
 		Tanggal:     req.Tanggal,
-		Status:      req.Status,
-		Keterangan:  req.Keterangan,
-		KuotaCustom: req.KuotaCustom,
+		Status:       req.Status,
+		Keterangan:   req.Keterangan,
+		KuotaCustom:  req.KuotaCustom,
+		WaktuMulai:   req.WaktuMulai,
+		WaktuSelesai: req.WaktuSelesai,
 	}
 
 	if err := ctrl.Service.SaveStatusKhusus(sk); err != nil {

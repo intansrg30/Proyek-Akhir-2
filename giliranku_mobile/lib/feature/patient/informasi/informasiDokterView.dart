@@ -38,16 +38,19 @@ class _InformasiDokterPageState extends State<InformasiDokterPage> {
     setState(() { _isLoading = true; _isError = false; });
     try {
       final polis = await ApiDataSource().fetchPoliklinik();
-      final today = DateTime.now().toIso8601String().split('T')[0];
+      DateTime currentDate = DateTime.now();
+      DateTime currentMonday = currentDate.subtract(Duration(days: currentDate.weekday - 1));
+      DateTime targetDate = currentMonday.add(Duration(days: _selectedDayIndex));
+      final targetDateStr = targetDate.toIso8601String().split('T')[0];
       
       List<Map<String, dynamic>> allDocs = [];
       if (polis.isNotEmpty) {
         final results = await Future.wait(
-          polis.map((p) => ApiDataSource().fetchDokterByPoly(p['poly_id'] ?? p['id'], today).catchError((_) => <Map<String, dynamic>>[]))
+          polis.map((p) => ApiDataSource().fetchDokterByPoly(p['poly_id'] ?? p['id'], targetDateStr).catchError((_) => <Map<String, dynamic>>[]))
         );
         allDocs = results.expand((x) => x).toList();
       } else {
-        allDocs = await ApiDataSource().fetchDokterByPoly(null);
+        allDocs = await ApiDataSource().fetchDokterByPoly(null, targetDateStr);
       }
 
       if (mounted) {
@@ -85,8 +88,8 @@ class _InformasiDokterPageState extends State<InformasiDokterPage> {
   void _onDaySelected(int index) {
     setState(() {
       _selectedDayIndex = index;
-      _applyFilters();
     });
+    _fetchData();
   }
 
   void _onSearch(String value) {

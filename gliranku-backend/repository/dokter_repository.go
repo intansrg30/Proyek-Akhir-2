@@ -267,17 +267,25 @@ func (r *DokterRepository) IsUsedInAntrian(id int) (bool, error) {
 
 func (r *DokterRepository) SaveStatusKhusus(sk *models.DokterStatusKhusus) error {
 	query := `
-		INSERT INTO status_dokter (dokter_id, tanggal, status, keterangan, kuota_custom)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (dokter_id, tanggal) DO UPDATE SET status = $3, keterangan = $4, kuota_custom = $5
+		INSERT INTO status_dokter (dokter_id, tanggal, status, keterangan, kuota_custom, waktu_mulai, waktu_selesai)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (dokter_id, tanggal) DO UPDATE SET status = $3, keterangan = $4, kuota_custom = $5, waktu_mulai = $6, waktu_selesai = $7
 		RETURNING id
 	`
-	return r.DB.QueryRow(query, sk.DokterID, sk.Tanggal, sk.Status, sk.Keterangan, sk.KuotaCustom).Scan(&sk.ID)
+	waktuMulai := ""
+	if sk.WaktuMulai != nil {
+		waktuMulai = *sk.WaktuMulai
+	}
+	waktuSelesai := ""
+	if sk.WaktuSelesai != nil {
+		waktuSelesai = *sk.WaktuSelesai
+	}
+	return r.DB.QueryRow(query, sk.DokterID, sk.Tanggal, sk.Status, sk.Keterangan, sk.KuotaCustom, waktuMulai, waktuSelesai).Scan(&sk.ID)
 }
 
 func (r *DokterRepository) GetStatusKhususByDoctor(dokterID int) ([]models.DokterStatusKhusus, error) {
 	query := `
-		SELECT id, dokter_id, tanggal, status, COALESCE(keterangan, ''), kuota_custom
+		SELECT id, dokter_id, tanggal, status, COALESCE(keterangan, ''), kuota_custom, COALESCE(waktu_mulai, ''), COALESCE(waktu_selesai, '')
 		FROM status_dokter
 		WHERE dokter_id = $1
 		ORDER BY tanggal ASC
@@ -291,8 +299,15 @@ func (r *DokterRepository) GetStatusKhususByDoctor(dokterID int) ([]models.Dokte
 	var results []models.DokterStatusKhusus
 	for rows.Next() {
 		var sk models.DokterStatusKhusus
-		if err := rows.Scan(&sk.ID, &sk.DokterID, &sk.Tanggal, &sk.Status, &sk.Keterangan, &sk.KuotaCustom); err != nil {
+		var wMulai, wSelesai string
+		if err := rows.Scan(&sk.ID, &sk.DokterID, &sk.Tanggal, &sk.Status, &sk.Keterangan, &sk.KuotaCustom, &wMulai, &wSelesai); err != nil {
 			return nil, err
+		}
+		if wMulai != "" {
+			sk.WaktuMulai = &wMulai
+		}
+		if wSelesai != "" {
+			sk.WaktuSelesai = &wSelesai
 		}
 		results = append(results, sk)
 	}
@@ -304,14 +319,15 @@ func (r *DokterRepository) DeleteStatusKhusus(id int) error {
 	return err
 }
 
-func (r *DokterRepository) GetDoctorStatusOnDate(dokterID int, tanggal string) (string, error) {
+func (r *DokterRepository) GetDoctorStatusOnDate(dokterID int, tanggal string) (string, string, string, error) {
 	var status string
-	err := r.DB.QueryRow(`SELECT status FROM status_dokter WHERE dokter_id = $1 AND tanggal = $2::date`, dokterID, tanggal).Scan(&status)
+	var wMulai, wSelesai sql.NullString
+	err := r.DB.QueryRow(`SELECT status, waktu_mulai, waktu_selesai FROM status_dokter WHERE dokter_id = $1 AND tanggal = $2::date`, dokterID, tanggal).Scan(&status, &wMulai, &wSelesai)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return "hadir", nil
+			return "hadir", "", "", nil
 		}
-		return "", err
+		return "", "", "", err
 	}
-	return status, nil
+	return status, wMulai.String, wSelesai.String, nil
 }

@@ -28,7 +28,7 @@ type AntrianRepository interface {
 	DeleteAntrian(kodeBooking string) error
 	IncrementPrintCount(kodeBooking string) error
 	HasActiveAntrianInPoli(nik string, tanggal time.Time, poliID int) (bool, error)
-	GetDoctorStatusOnDate(dokterID int, tanggal string) (string, error)
+	GetDoctorStatusOnDate(dokterID int, tanggal string) (string, string, string, error)
 	GetRemainingQuotaOnDate(dokterID int, tanggal string) (int, error)
 }
 
@@ -414,16 +414,17 @@ func (r *antrianRepository) HasActiveAntrianInPoli(nik string, tanggal time.Time
 	return count > 0, nil
 }
 
-func (r *antrianRepository) GetDoctorStatusOnDate(dokterID int, tanggal string) (string, error) {
+func (r *antrianRepository) GetDoctorStatusOnDate(dokterID int, tanggal string) (string, string, string, error) {
 	var status string
-	err := r.db.QueryRow(`SELECT status FROM status_dokter WHERE dokter_id = $1 AND tanggal = $2::date`, dokterID, tanggal).Scan(&status)
+	var wMulai, wSelesai sql.NullString
+	err := r.db.QueryRow(`SELECT status, waktu_mulai, waktu_selesai FROM status_dokter WHERE dokter_id = $1 AND tanggal = $2::date`, dokterID, tanggal).Scan(&status, &wMulai, &wSelesai)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return "hadir", nil
+			return "hadir", "", "", nil
 		}
-		return "", err
+		return "", "", "", err
 	}
-	return status, nil
+	return status, wMulai.String, wSelesai.String, nil
 }
 
 func (r *antrianRepository) GetRemainingQuotaOnDate(dokterID int, tanggal string) (int, error) {

@@ -6,5 +6,7 @@ type DokterStatusKhusus struct {
 	Tanggal     string `json:"tanggal"`
 	Status      string `json:"status"`
 	Keterangan  string `json:"keterangan"`
-	KuotaCustom *int   `json:"kuota_custom,omitempty"`
+	KuotaCustom  *int    `json:"kuota_custom,omitempty"`
+	WaktuMulai   *string `json:"waktu_mulai,omitempty"`
+	WaktuSelesai *string `json:"waktu_selesai,omitempty"`
 }

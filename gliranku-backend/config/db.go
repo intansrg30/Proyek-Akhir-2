@@ -101,5 +101,15 @@ func runMigrations(db *sql.DB) {
 	if errRM != nil {
 		log.Printf("[migration] Warning altering no_rm column: %v", errRM)
 	}
+
+	_, errStatusMulai := db.Exec(`ALTER TABLE status_dokter ADD COLUMN IF NOT EXISTS waktu_mulai VARCHAR(5) DEFAULT '';`)
+	if errStatusMulai != nil {
+		log.Printf("[migration] Warning altering waktu_mulai column: %v", errStatusMulai)
+	}
+	_, errStatusSelesai := db.Exec(`ALTER TABLE status_dokter ADD COLUMN IF NOT EXISTS waktu_selesai VARCHAR(5) DEFAULT '';`)
+	if errStatusSelesai != nil {
+		log.Printf("[migration] Warning altering waktu_selesai column: %v", errStatusSelesai)
+	}
+
 	log.Println("[migration] Auto-migrations finished.")
 }

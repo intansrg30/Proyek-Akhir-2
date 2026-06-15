@@ -120,12 +120,33 @@ func (s *antrianService) CreateAntrian(req request.AntrianRequest) (*response.An
 
 	if req.DokterID != nil {
 		tanggalStr := tanggal.Format("2006-01-02")
-		docStatus, err := s.repo.GetDoctorStatusOnDate(*req.DokterID, tanggalStr)
+		docStatus, wMulai, wSelesai, err := s.repo.GetDoctorStatusOnDate(*req.DokterID, tanggalStr)
 		if err != nil {
 			return nil, fmt.Errorf("gagal memeriksa status dokter: %w", err)
 		}
 		if strings.ToLower(docStatus) != "hadir" {
-			return nil, fmt.Errorf("dokter tidak tersedia pada tanggal tersebut (status: %s)", docStatus)
+			if wMulai != "" && wSelesai != "" {
+				loc, _ := time.LoadLocation("Asia/Jakarta")
+				nowWIB := time.Now().In(loc)
+				var checkTime time.Time
+				if tanggal.Format("2006-01-02") == nowWIB.Format("2006-01-02") {
+					checkTime = nowWIB
+				} else {
+					checkTime, _ = time.ParseInLocation("2006-01-02 15:04", tanggal.Format("2006-01-02")+" 08:00", loc)
+				}
+				tMulai, err1 := time.ParseInLocation("2006-01-02 15:04", tanggal.Format("2006-01-02")+" "+wMulai, loc)
+				tSelesai, err2 := time.ParseInLocation("2006-01-02 15:04", tanggal.Format("2006-01-02")+" "+wSelesai, loc)
+				
+				if err1 == nil && err2 == nil {
+					if (checkTime.Equal(tMulai) || checkTime.After(tMulai)) && (checkTime.Equal(tSelesai) || checkTime.Before(tSelesai)) {
+						return nil, fmt.Errorf("dokter sedang %s dari jam %s sampai %s", docStatus, wMulai, wSelesai)
+					}
+				} else {
+					return nil, fmt.Errorf("dokter tidak tersedia pada tanggal tersebut (status: %s)", docStatus)
+				}
+			} else {
+				return nil, fmt.Errorf("dokter tidak tersedia pada tanggal tersebut (status: %s)", docStatus)
+			}
 		}
 		remaining, err := s.repo.GetRemainingQuotaOnDate(*req.DokterID, tanggalStr)
 		if err != nil {
@@ -351,12 +372,28 @@ func (s *antrianService) CreateBpjsAntrian(req request.BpjsAntrianRequest) (*res
 
 	if req.DokterID != nil {
 		tanggalStr := tanggal.Format("2006-01-02")
-		docStatus, err := s.repo.GetDoctorStatusOnDate(*req.DokterID, tanggalStr)
+		docStatus, wMulai, wSelesai, err := s.repo.GetDoctorStatusOnDate(*req.DokterID, tanggalStr)
 		if err != nil {
 			return nil, fmt.Errorf("gagal memeriksa status dokter: %w", err)
 		}
 		if strings.ToLower(docStatus) != "hadir" {
-			return nil, fmt.Errorf("dokter tidak tersedia pada hari ini (status: %s)", docStatus)
+			if wMulai != "" && wSelesai != "" {
+				loc, _ := time.LoadLocation("Asia/Jakarta")
+				nowWIB := time.Now().In(loc)
+				
+				tMulai, err1 := time.ParseInLocation("2006-01-02 15:04", tanggal.Format("2006-01-02")+" "+wMulai, loc)
+				tSelesai, err2 := time.ParseInLocation("2006-01-02 15:04", tanggal.Format("2006-01-02")+" "+wSelesai, loc)
+				
+				if err1 == nil && err2 == nil {
+					if (nowWIB.Equal(tMulai) || nowWIB.After(tMulai)) && (nowWIB.Equal(tSelesai) || nowWIB.Before(tSelesai)) {
+						return nil, fmt.Errorf("dokter sedang %s dari jam %s sampai %s", docStatus, wMulai, wSelesai)
+					}
+				} else {
+					return nil, fmt.Errorf("dokter tidak tersedia pada hari ini (status: %s)", docStatus)
+				}
+			} else {
+				return nil, fmt.Errorf("dokter tidak tersedia pada hari ini (status: %s)", docStatus)
+			}
 		}
 		remaining, err := s.repo.GetRemainingQuotaOnDate(*req.DokterID, tanggalStr)
 		if err != nil {

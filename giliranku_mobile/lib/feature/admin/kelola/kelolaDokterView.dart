@@ -667,6 +667,8 @@ class _StatusKhususDialogState extends State<_StatusKhususDialog> {
     String selectedStatus = 'hadir';
     final keteranganCtrl = TextEditingController();
     final kuotaCustomCtrl = TextEditingController();
+    TimeOfDay? jamMulai;
+    TimeOfDay? jamSelesai;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -738,6 +740,43 @@ class _StatusKhususDialogState extends State<_StatusKhususDialog> {
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+              if (selectedStatus != 'hadir')
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.access_time, size: 16),
+                        label: Text(jamMulai != null ? jamMulai!.format(context) : 'Jam Mulai'),
+                        onPressed: () async {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: const TimeOfDay(hour: 8, minute: 0),
+                          );
+                          if (time != null) {
+                            setDialogState(() => jamMulai = time);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.access_time, size: 16),
+                        label: Text(jamSelesai != null ? jamSelesai!.format(context) : 'Jam Selesai'),
+                        onPressed: () async {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: const TimeOfDay(hour: 12, minute: 0),
+                          );
+                          if (time != null) {
+                            setDialogState(() => jamSelesai = time);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
           actions: [
@@ -758,6 +797,10 @@ class _StatusKhususDialogState extends State<_StatusKhususDialog> {
 
     if (confirmed != true || !mounted) return;
 
+    String formatTime(TimeOfDay t) {
+      return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    }
+
     final result = await ApiDataSource().setDokterStatusKhusus({
       'dokter_id': widget.dokterID,
       'tanggal': pickedDate.toIso8601String().substring(0, 10),
@@ -765,6 +808,10 @@ class _StatusKhususDialogState extends State<_StatusKhususDialog> {
       'keterangan': keteranganCtrl.text.trim(),
       if (kuotaCustomCtrl.text.trim().isNotEmpty)
         'kuota_custom': int.tryParse(kuotaCustomCtrl.text.trim()),
+      if (jamMulai != null && selectedStatus != 'hadir')
+        'waktu_mulai': formatTime(jamMulai!),
+      if (jamSelesai != null && selectedStatus != 'hadir')
+        'waktu_selesai': formatTime(jamSelesai!),
     });
 
     if (!mounted) return;
@@ -904,7 +951,7 @@ class _StatusKhususDialogState extends State<_StatusKhususDialog> {
                                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                                       ),
                                       Text(
-                                        '${(sk['status'] ?? '')[0].toUpperCase()}${(sk['status'] ?? '').substring(1)}${(sk['kuota_custom'] != null) ? ' (Kuota: ${sk['kuota_custom']})' : ''}${(sk['keterangan'] ?? '').isNotEmpty ? ' — ${sk['keterangan']}' : ''}',
+                                        '${(sk['status'] ?? '')[0].toUpperCase()}${(sk['status'] ?? '').substring(1)}${(sk['waktu_mulai'] != null && sk['waktu_mulai'].toString().isNotEmpty) ? ' (${sk['waktu_mulai']} - ${sk['waktu_selesai']})' : ''}${(sk['kuota_custom'] != null) ? ' (Kuota: ${sk['kuota_custom']})' : ''}${(sk['keterangan'] ?? '').isNotEmpty ? ' — ${sk['keterangan']}' : ''}',
                                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                                       ),
                                     ],
