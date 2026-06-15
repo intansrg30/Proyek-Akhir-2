@@ -4,6 +4,8 @@ type Pasien struct {
 	NIK           string  `json:"nik"`
 	NoRM          *string `json:"no_rm,omitempty"`
 	PatientName   string  `json:"patient_name"`
+	Username      *string `json:"username,omitempty"`
+	Password      *string `json:"-"`
 	Phone         *string `json:"phone,omitempty"`
 	Email         *string `json:"email,omitempty"`
 	NoBPJS        *string `json:"no_bpjs,omitempty"`

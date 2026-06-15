@@ -18,11 +18,13 @@ func (r *DokterRepository) FindByPolyID(polyID int, tanggal string) ([]models.Do
 		SELECT c.id as category_id, c.namadokter, c."IdPoli", p."NamaPoli", d."NoTelp", d."Spesialisasi", s.nama, c.options as schedule,
 		       COALESCE(c.senin,''), COALESCE(c.selasa,''), COALESCE(c.rabu,''),
 		       COALESCE(c.kamis,''), COALESCE(c.jumat,''), COALESCE(c.sabtu,''), COALESCE(c.minggu,''),
-		       (COALESCE(c."KuotaNonJKN", 30) - (SELECT COUNT(*) FROM antrian a WHERE a.dokter_id = c.id AND DATE(a.tanggal) = $2::date AND status != 'dibatalkan')), COALESCE(c."KuotaNonJKN", 30)
+		       (COALESCE(sk.kuota_custom, c."KuotaNonJKN", 30) - (SELECT COUNT(*) FROM antrian a WHERE a.dokter_id = c.id AND DATE(a.tanggal) = $2::date AND status != 'dibatalkan')), COALESCE(sk.kuota_custom, c."KuotaNonJKN", 30),
+		       COALESCE(sk.status, 'hadir'), COALESCE(sk.keterangan, '')
 		FROM category c
 		JOIN tbpoli p ON c."IdPoli" = p."IdPoli"
 		LEFT JOIN tbdaftardokter d ON c."IdDokter" = d."IdDokter"
 		LEFT JOIN tbspesialis s ON d."Spesialisasi" = s.id
+		LEFT JOIN status_dokter sk ON sk.dokter_id = c.id AND sk.tanggal = $2::date
 		WHERE c."IdPoli" = $1 AND c.app = 1
 		ORDER BY c.namadokter ASC
 	`
@@ -43,7 +45,8 @@ func (r *DokterRepository) FindByPolyID(polyID int, tanggal string) ([]models.Do
 		var spesialisasiNama sql.NullString
 
 		err := rows.Scan(&d.DoctorID, &d.DoctorName, &d.PolyID, &d.PolyName, &telp, &spesialisasi, &spesialisasiNama, &schedule,
-			&d.Senin, &d.Selasa, &d.Rabu, &d.Kamis, &d.Jumat, &d.Sabtu, &d.Minggu, &d.KuotaNonJKN, &d.MaxKuotaNonJKN)
+			&d.Senin, &d.Selasa, &d.Rabu, &d.Kamis, &d.Jumat, &d.Sabtu, &d.Minggu, &d.KuotaNonJKN, &d.MaxKuotaNonJKN,
+			&d.StatusInfo, &d.StatusKeterangan)
 		if err != nil {
 			return nil, err
 		}
@@ -248,4 +251,64 @@ func (r *DokterRepository) Delete(id int) error {
 	query := `DELETE FROM category WHERE id = $1`
 	_, err := r.DB.Exec(query, id)
 	return err
+}
+
+func (r *DokterRepository) IsUsedInAntrian(id int) (bool, error) {
+	var count int
+	err := r.DB.QueryRow(`SELECT COUNT(*) FROM antrian WHERE dokter_id = $1`, id).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *DokterRepository) SaveStatusKhusus(sk *models.DokterStatusKhusus) error {
+	query := `
+		INSERT INTO status_dokter (dokter_id, tanggal, status, keterangan, kuota_custom)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (dokter_id, tanggal) DO UPDATE SET status = $3, keterangan = $4, kuota_custom = $5
+		RETURNING id
+	`
+	return r.DB.QueryRow(query, sk.DokterID, sk.Tanggal, sk.Status, sk.Keterangan, sk.KuotaCustom).Scan(&sk.ID)
+}
+
+func (r *DokterRepository) GetStatusKhususByDoctor(dokterID int) ([]models.DokterStatusKhusus, error) {
+	query := `
+		SELECT id, dokter_id, tanggal, status, COALESCE(keterangan, ''), kuota_custom
+		FROM status_dokter
+		WHERE dokter_id = $1
+		ORDER BY tanggal ASC
+	`
+	rows, err := r.DB.Query(query, dokterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []models.DokterStatusKhusus
+	for rows.Next() {
+		var sk models.DokterStatusKhusus
+		if err := rows.Scan(&sk.ID, &sk.DokterID, &sk.Tanggal, &sk.Status, &sk.Keterangan, &sk.KuotaCustom); err != nil {
+			return nil, err
+		}
+		results = append(results, sk)
+	}
+	return results, nil
+}
+
+func (r *DokterRepository) DeleteStatusKhusus(id int) error {
+	_, err := r.DB.Exec(`DELETE FROM status_dokter WHERE id = $1`, id)
+	return err
+}
+
+func (r *DokterRepository) GetDoctorStatusOnDate(dokterID int, tanggal string) (string, error) {
+	var status string
+	err := r.DB.QueryRow(`SELECT status FROM status_dokter WHERE dokter_id = $1 AND tanggal = $2::date`, dokterID, tanggal).Scan(&status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "hadir", nil
+		}
+		return "", err
+	}
+	return status, nil
 }

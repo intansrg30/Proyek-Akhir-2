@@ -25,7 +25,7 @@ func (ctrl *PasienController) Login(c *gin.Context) {
 		return
 	}
 
-	result, err := ctrl.Service.Login(req.NIK, req.Name)
+	result, err := ctrl.Service.Login(req.Username, req.Password)
 	if err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -37,13 +37,39 @@ func (ctrl *PasienController) Login(c *gin.Context) {
 		return
 	}
 
-	// Bungkus result dengan token
 	response := gin.H{
 		"patient": result,
 		"token":   token,
 	}
 
 	utils.Success(c, http.StatusOK, "Login berhasil", response)
+}
+
+func (ctrl *PasienController) Register(c *gin.Context) {
+	var req request.RegisterPasienRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ValidationError(c, "Data tidak valid", err.Error())
+		return
+	}
+
+	result, err := ctrl.Service.Register(req.NIK, req.PatientName, req.Username, req.Password, req.Phone)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	token, err := utils.GenerateToken(result.NIK)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, "Gagal membuat sesi: "+err.Error())
+		return
+	}
+
+	response := gin.H{
+		"patient": result,
+		"token":   token,
+	}
+
+	utils.Success(c, http.StatusCreated, "Registrasi berhasil", response)
 }
 
 func (ctrl *PasienController) GetProfile(c *gin.Context) {

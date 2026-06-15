@@ -1,0 +1,1 @@
+ALTER TABLE status_dokter ADD COLUMN kuota_custom INTEGER DEFAULT NULL;

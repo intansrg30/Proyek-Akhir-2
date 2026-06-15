@@ -19,4 +19,6 @@ type Dokter struct {
 	Jumat   string `json:"jumat,omitempty"`
 	Sabtu   string `json:"sabtu,omitempty"`
 	Minggu  string `json:"minggu,omitempty"`
+	StatusInfo       string `json:"status_info,omitempty"`
+	StatusKeterangan string `json:"status_keterangan,omitempty"`
 }

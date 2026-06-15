@@ -378,6 +378,15 @@ class _KelolaDokterViewState extends State<KelolaDokterView> {
     );
   }
 
+  void _showStatusDialog(int dokterID, String doctorName) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return _StatusKhususDialog(dokterID: dokterID, doctorName: doctorName);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -511,6 +520,18 @@ class _KelolaDokterViewState extends State<KelolaDokterView> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           GestureDetector(
+                                            onTap: () => _showStatusDialog(item['doctor_id'], item['doctor_name']),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(6),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(Icons.calendar_month, color: Colors.orange, size: 18),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          GestureDetector(
                                             onTap: () => _showFormDialog(dokter: item),
                                             child: Container(
                                               padding: const EdgeInsets.all(6),
@@ -583,6 +604,347 @@ class _KelolaDokterViewState extends State<KelolaDokterView> {
         onPressed: () => _showFormDialog(),
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _StatusKhususDialog extends StatefulWidget {
+  final int dokterID;
+  final String doctorName;
+
+  const _StatusKhususDialog({required this.dokterID, required this.doctorName});
+
+  @override
+  State<_StatusKhususDialog> createState() => _StatusKhususDialogState();
+}
+
+class _StatusKhususDialogState extends State<_StatusKhususDialog> {
+  List<Map<String, dynamic>> _statusList = [];
+  bool _isLoading = true;
+
+  static const _statusOptions = [
+    'hadir',
+    'tidak hadir',
+    'ada urusan',
+    'cuti',
+    'sakit',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStatuses();
+  }
+
+  Future<void> _fetchStatuses() async {
+    setState(() => _isLoading = true);
+    final list = await ApiDataSource().getDokterStatusKhusus(widget.dokterID);
+    if (mounted) {
+      setState(() {
+        _statusList = list;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _addStatus() async {
+    DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(primary: Color(0xFF2F9E8F)),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (pickedDate == null || !mounted) return;
+
+    String selectedStatus = 'hadir';
+    final keteranganCtrl = TextEditingController();
+    final kuotaCustomCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Atur Status Kehadiran',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tanggal: ${pickedDate.toIso8601String().substring(0, 10)}',
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedStatus,
+                    items: _statusOptions.map((s) {
+                      return DropdownMenuItem(value: s, child: Text(s[0].toUpperCase() + s.substring(1)));
+                    }).toList(),
+                    onChanged: (val) => setDialogState(() => selectedStatus = val!),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: keteranganCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Keterangan (opsional)',
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: kuotaCustomCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: 'Kuota Khusus (opsional)',
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2F9E8F),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final result = await ApiDataSource().setDokterStatusKhusus({
+      'dokter_id': widget.dokterID,
+      'tanggal': pickedDate.toIso8601String().substring(0, 10),
+      'status': selectedStatus,
+      'keterangan': keteranganCtrl.text.trim(),
+      if (kuotaCustomCtrl.text.trim().isNotEmpty)
+        'kuota_custom': int.tryParse(kuotaCustomCtrl.text.trim()),
+    });
+
+    if (!mounted) return;
+
+    if (result != null && result['error'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Status kehadiran berhasil disimpan'), backgroundColor: Colors.green),
+      );
+      _fetchStatuses();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result?['error']?.toString() ?? 'Gagal menyimpan status'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteStatus(int id) async {
+    final success = await ApiDataSource().deleteDokterStatusKhusus(id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(success ? 'Status berhasil dihapus' : 'Gagal menghapus status'),
+      backgroundColor: success ? Colors.green : Colors.red,
+    ));
+    if (success) _fetchStatuses();
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'hadir':
+        return Colors.green;
+      case 'tidak hadir':
+        return Colors.red;
+      case 'ada urusan':
+        return Colors.orange;
+      case 'cuti':
+        return Colors.blue;
+      case 'sakit':
+        return Colors.purple;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(24, 20, 20, 20),
+            decoration: const BoxDecoration(
+              color: Color(0xFF2F9E8F),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Status Kehadiran\ndr. ${widget.doctorName}',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 18),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: _isLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(),
+                  )
+                : _statusList.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.event_available, size: 48, color: Colors.grey[300]),
+                            const SizedBox(height: 8),
+                            Text('Belum ada status khusus',
+                                style: TextStyle(color: Colors.grey[500])),
+                            const Text('Default: Hadir setiap hari',
+                                style: TextStyle(color: Colors.green, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _statusList.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final sk = _statusList[i];
+                          final color = _statusColor(sk['status'] ?? '');
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: color.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.circle, size: 10, color: color),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        (sk['tanggal'] ?? '').toString().substring(0, 10),
+                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                      ),
+                                      Text(
+                                        '${(sk['status'] ?? '')[0].toUpperCase()}${(sk['status'] ?? '').substring(1)}${(sk['kuota_custom'] != null) ? ' (Kuota: ${sk['kuota_custom']})' : ''}${(sk['keterangan'] ?? '').isNotEmpty ? ' — ${sk['keterangan']}' : ''}',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () => _deleteStatus(sk['id']),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.delete, color: Colors.red, size: 16),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _addStatus,
+                icon: const Icon(Icons.add),
+                label: const Text('Tambah Status Khusus'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2F9E8F),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS status_dokter;
+ALTER TABLE pasien DROP COLUMN IF EXISTS password;
+ALTER TABLE pasien DROP COLUMN IF EXISTS username;

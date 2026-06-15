@@ -27,6 +27,9 @@ type AntrianRepository interface {
 	GetDoctorNameByID(doctorID int) (string, error)
 	DeleteAntrian(kodeBooking string) error
 	IncrementPrintCount(kodeBooking string) error
+	HasActiveAntrianToday(nik string, tanggal time.Time) (bool, error)
+	GetDoctorStatusOnDate(dokterID int, tanggal string) (string, error)
+	GetRemainingQuotaOnDate(dokterID int, tanggal string) (int, error)
 }
 
 type antrianRepository struct {
@@ -392,4 +395,50 @@ func (r *antrianRepository) IncrementPrintCount(kodeBooking string) error {
 		WHERE kode_booking = $1
 	`, kodeBooking)
 	return err
+}
+
+func (r *antrianRepository) HasActiveAntrianToday(nik string, tanggal time.Time) (bool, error) {
+	dateStr := tanggal.Format("2006-01-02")
+	var count int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM antrian
+		WHERE nik = $1
+		  AND tanggal >= $2::date
+		  AND tanggal < ($2::date + interval '1 day')
+		  AND status != 'dibatalkan'
+	`, nik, dateStr).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *antrianRepository) GetDoctorStatusOnDate(dokterID int, tanggal string) (string, error) {
+	var status string
+	err := r.db.QueryRow(`SELECT status FROM status_dokter WHERE dokter_id = $1 AND tanggal = $2::date`, dokterID, tanggal).Scan(&status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "hadir", nil
+		}
+		return "", err
+	}
+	return status, nil
+}
+
+func (r *antrianRepository) GetRemainingQuotaOnDate(dokterID int, tanggal string) (int, error) {
+	var remaining int
+	query := `
+		SELECT (COALESCE(sk.kuota_custom, c."KuotaNonJKN", 30) - (SELECT COUNT(*) FROM antrian a WHERE a.dokter_id = c.id AND DATE(a.tanggal) = $2::date AND status != 'dibatalkan'))
+		FROM category c
+		LEFT JOIN status_dokter sk ON sk.dokter_id = c.id AND sk.tanggal = $2::date
+		WHERE c.id = $1
+	`
+	err := r.db.QueryRow(query, dokterID, tanggal).Scan(&remaining)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, fmt.Errorf("dokter tidak ditemukan")
+		}
+		return 0, err
+	}
+	return remaining, nil
 }

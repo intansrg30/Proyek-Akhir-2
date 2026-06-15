@@ -1,8 +1,16 @@
 package request
 
 type LoginPasienRequest struct {
-	NIK  string `json:"nik" binding:"required"`
-	Name string `json:"name" binding:"required"`
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type RegisterPasienRequest struct {
+	NIK         string `json:"nik" binding:"required"`
+	PatientName string `json:"patient_name" binding:"required"`
+	Username    string `json:"username" binding:"required"`
+	Password    string `json:"password" binding:"required"`
+	Phone       string `json:"phone"`
 }
 
 type UpdatePasienProfileRequest struct {

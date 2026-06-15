@@ -1,6 +1,7 @@
 class PasienModel {
   final String nik;
   final String name;
+  final String? username;
   final String? phone;
   final String? email;
   final String? bpjs;
@@ -12,6 +13,7 @@ class PasienModel {
   const PasienModel({
     required this.nik,
     required this.name,
+    this.username,
     this.phone,
     this.email,
     this.bpjs,
@@ -24,6 +26,7 @@ class PasienModel {
   factory PasienModel.fromJson(Map<String, dynamic> json) => PasienModel(
     nik: json['nik'] as String? ?? '',
     name: json['patient_name'] as String? ?? json['name'] as String? ?? '',
+    username: json['username'] as String?,
     phone: json['phone'] as String?,
     email: json['email'] as String?,
     bpjs: json['no_bpjs'] as String?,
@@ -36,6 +39,7 @@ class PasienModel {
   Map<String, dynamic> toJson() => {
     'nik': nik,
     'patient_name': name,
+    'username': username,
     'phone': phone,
     'email': email,
     'no_bpjs': bpjs,
@@ -48,6 +52,7 @@ class PasienModel {
   Map<String, dynamic> toMap() => {
     'nik': nik,
     'patient_name': name,
+    'username': username,
     'phone': phone,
     'email': email,
     'no_bpjs': bpjs,

@@ -1,45 +1,68 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:giliranku/feature/patient/home/homeView.dart';
-import 'package:giliranku/feature/auth/adminLoginView.dart';
-import 'package:giliranku/feature/auth/registerView.dart';
 import 'package:giliranku/core/repositories/pasienRepository.dart';
-import 'package:giliranku/core/repositories/kontrolRutinRepository.dart';
 import 'package:giliranku/core/services/sessionService.dart';
 import 'package:giliranku/core/datasources/apiDataSource.dart';
 
-class LoginView extends StatefulWidget {
-  const LoginView({super.key});
+class RegisterView extends StatefulWidget {
+  const RegisterView({super.key});
 
   @override
-  State<LoginView> createState() => _LoginViewState();
+  State<RegisterView> createState() => _RegisterViewState();
 }
 
-class _LoginViewState extends State<LoginView> {
-  final TextEditingController _usernameCtrl = TextEditingController();
-  final TextEditingController _passwordCtrl = TextEditingController();
+class _RegisterViewState extends State<RegisterView> {
+  final _nikCtrl = TextEditingController();
+  final _namaCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _teleponCtrl = TextEditingController();
 
-  final FocusNode _usernameFocus = FocusNode();
-  final FocusNode _passwordFocus = FocusNode();
+  final _nikFocus = FocusNode();
+  final _namaFocus = FocusNode();
+  final _usernameFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _teleponFocus = FocusNode();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
 
   final _pasienRepo = PasienRepository();
-  final _kontrolRepo = KontrolRutinRepository();
   final _sessionService = SessionService();
 
-  Future<void> _masukPasien() async {
+  Future<void> _daftar() async {
+    final nik = _nikCtrl.text.trim();
+    final nama = _namaCtrl.text.trim();
     final username = _usernameCtrl.text.trim();
     final password = _passwordCtrl.text.trim();
+    final telepon = _teleponCtrl.text.trim();
 
-    if (username.isEmpty || password.isEmpty) {
-      _showError('Mohon isi Username dan Password');
+    if (nik.isEmpty || nama.isEmpty || username.isEmpty || password.isEmpty) {
+      _showError('Semua kolom wajib harus diisi');
+      return;
+    }
+    if (nik.length != 16) {
+      _showError('NIK harus 16 digit');
+      return;
+    }
+    if (username.length < 4) {
+      _showError('Username minimal 4 karakter');
+      return;
+    }
+    if (password.length < 6) {
+      _showError('Password minimal 6 karakter');
       return;
     }
 
     setState(() => _isLoading = true);
-    final patient = await _pasienRepo.login(username, password);
+    final patient = await _pasienRepo.register({
+      'nik': nik,
+      'patient_name': nama,
+      'username': username,
+      'password': password,
+      'phone': telepon,
+    });
     setState(() => _isLoading = false);
 
     if (!mounted) return;
@@ -49,47 +72,24 @@ class _LoginViewState extends State<LoginView> {
       return;
     }
     if (patient.nik.isEmpty) {
-      _showError(patient.phone ?? 'Login gagal');
+      _showError(patient.phone ?? 'Registrasi gagal');
       return;
     }
 
     final token = ApiDataSource().authToken;
     await _sessionService.savePatient(patient, token: token);
-    try {
-      await _kontrolRepo.resyncNotifications(patient.nik);
-    } catch (e) {
-      debugPrint('resyncNotifications error (diabaikan): $e');
-    }
 
     if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Registrasi berhasil!'),
+        backgroundColor: Colors.green,
+      ),
+    );
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => HomeView(patientData: patient.toMap())),
       (route) => false,
-    );
-  }
-
-  Future<void> _lewatkan() async {
-    await _sessionService.saveGuest();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const HomeView()),
-      (route) => false,
-    );
-  }
-
-  void _masukSebagaiAdmin() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const AdminLoginView()),
-    );
-  }
-
-  void _bukaRegister() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const RegisterView()),
     );
   }
 
@@ -101,10 +101,16 @@ class _LoginViewState extends State<LoginView> {
 
   @override
   void dispose() {
+    _nikCtrl.dispose();
+    _namaCtrl.dispose();
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
+    _teleponCtrl.dispose();
+    _nikFocus.dispose();
+    _namaFocus.dispose();
     _usernameFocus.dispose();
     _passwordFocus.dispose();
+    _teleponFocus.dispose();
     super.dispose();
   }
 
@@ -121,14 +127,14 @@ class _LoginViewState extends State<LoginView> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Transform.translate(
-                    offset: const Offset(0, -25),
+                    offset: const Offset(0, -15),
                     child: Image.asset(
                       'assets/images/logo.png',
-                      height: 120,
+                      height: 100,
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -149,7 +155,7 @@ class _LoginViewState extends State<LoginView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          "Masuk",
+                          "Daftar Akun",
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -159,17 +165,42 @@ class _LoginViewState extends State<LoginView> {
                         const SizedBox(height: 4),
 
                         const Text(
-                          "Silakan masuk dengan akun Anda",
+                          "Buat akun baru untuk melanjutkan",
                           style: TextStyle(color: Colors.grey),
                         ),
 
                         const SizedBox(height: 20),
 
                         _buildInput(
+                          controller: _nikCtrl,
+                          focusNode: _nikFocus,
+                          nextFocus: _namaFocus,
+                          hint: 'NIK (16 digit)',
+                          icon: Icons.credit_card,
+                          keyboardType: TextInputType.number,
+                          maxLength: 16,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _buildInput(
+                          controller: _namaCtrl,
+                          focusNode: _namaFocus,
+                          nextFocus: _usernameFocus,
+                          hint: 'Nama Lengkap',
+                          icon: Icons.badge_outlined,
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _buildInput(
                           controller: _usernameCtrl,
                           focusNode: _usernameFocus,
                           nextFocus: _passwordFocus,
-                          hint: 'Username',
+                          hint: 'Username (min. 4 karakter)',
                           icon: Icons.person,
                         ),
 
@@ -177,27 +208,36 @@ class _LoginViewState extends State<LoginView> {
 
                         _buildPasswordInput(),
 
+                        const SizedBox(height: 12),
+
+                        _buildInput(
+                          controller: _teleponCtrl,
+                          focusNode: _teleponFocus,
+                          hint: 'No. Telepon (opsional)',
+                          icon: Icons.phone,
+                          keyboardType: TextInputType.phone,
+                        ),
+
                         const SizedBox(height: 20),
 
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
+                              backgroundColor: const Color(0xFF25A699),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
                             ),
-                            onPressed:
-                                _isLoading ? null : _masukPasien,
+                            onPressed: _isLoading ? null : _daftar,
                             child: _isLoading
                                 ? const CircularProgressIndicator(
                                     color: Colors.white,
                                   )
                                 : const Text(
-                                    "Masuk",
+                                    "Daftar",
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -205,37 +245,18 @@ class _LoginViewState extends State<LoginView> {
                           ),
                         ),
 
-                        const SizedBox(height: 10),
-
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
-                              side: const BorderSide(
-                                  color: Color(0xFF25A699)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            onPressed: _lewatkan,
-                            child: const Text("Lewatkan"),
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
 
                         Center(
                           child: GestureDetector(
-                            onTap: _bukaRegister,
+                            onTap: () => Navigator.pop(context),
                             child: RichText(
                               text: const TextSpan(
-                                text: "Belum punya akun? ",
+                                text: "Sudah punya akun? ",
                                 style: TextStyle(color: Colors.grey),
                                 children: [
                                   TextSpan(
-                                    text: "Daftar",
+                                    text: "Masuk",
                                     style: TextStyle(
                                       color: Color(0xFF25A699),
                                       fontWeight: FontWeight.bold,
@@ -243,21 +264,6 @@ class _LoginViewState extends State<LoginView> {
                                     ),
                                   ),
                                 ],
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        Center(
-                          child: GestureDetector(
-                            onTap: _masukSebagaiAdmin,
-                            child: const Text(
-                              "Masuk sebagai Admin",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                decoration: TextDecoration.underline,
                               ),
                             ),
                           ),
@@ -282,12 +288,14 @@ class _LoginViewState extends State<LoginView> {
     FocusNode? nextFocus,
     TextInputType keyboardType = TextInputType.text,
     int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: controller,
       focusNode: focusNode,
       keyboardType: keyboardType,
       maxLength: maxLength,
+      inputFormatters: inputFormatters,
       textInputAction:
           nextFocus != null ? TextInputAction.next : TextInputAction.done,
       onSubmitted: (_) {
@@ -305,8 +313,7 @@ class _LoginViewState extends State<LoginView> {
         prefixIcon: Icon(icon, color: const Color(0xFF25A699)),
         filled: true,
         fillColor: Colors.grey[100],
-        contentPadding:
-            const EdgeInsets.symmetric(vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(vertical: 14),
         counterText: '',
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -321,12 +328,12 @@ class _LoginViewState extends State<LoginView> {
       controller: _passwordCtrl,
       focusNode: _passwordFocus,
       obscureText: _obscurePassword,
-      textInputAction: TextInputAction.done,
-      onSubmitted: (_) => _masukPasien(),
+      textInputAction: TextInputAction.next,
+      onSubmitted: (_) => FocusScope.of(context).requestFocus(_teleponFocus),
       style: const TextStyle(color: Colors.black),
       cursorColor: const Color(0xFF25A699),
       decoration: InputDecoration(
-        hintText: 'Password',
+        hintText: 'Password (min. 6 karakter)',
         hintStyle: const TextStyle(color: Colors.grey),
         prefixIcon: const Icon(Icons.lock, color: Color(0xFF25A699)),
         suffixIcon: IconButton(

@@ -18,6 +18,7 @@ func SetupPasienRoutes(r *gin.Engine, pasienCtrl *controller.PasienController, n
 	pasien := api.Group("/pasien")
 	{
 		pasien.POST("/login", middleware.StrictRateLimit(), pasienCtrl.Login)
+		pasien.POST("/register", middleware.StrictRateLimit(), pasienCtrl.Register)
 		pasien.GET("/profile/:nik", middleware.RequireAuth(), middleware.RequirePatientOwnership(), pasienCtrl.GetProfile)
 		pasien.PUT("/profile", middleware.RequireAuth(), pasienCtrl.UpdateProfile)
 	}

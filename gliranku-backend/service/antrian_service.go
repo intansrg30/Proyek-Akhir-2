@@ -100,6 +100,42 @@ func (s *antrianService) CreateAntrian(req request.AntrianRequest) (*response.An
 		tanggal = time.Now()
 	}
 
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	nowWIB := time.Now().In(loc)
+	if nowWIB.Weekday() == time.Sunday {
+		return nil, fmt.Errorf("pendaftaran antrian tidak tersedia pada hari Minggu")
+	}
+	hour := nowWIB.Hour()
+	if hour < 8 || hour >= 16 {
+		return nil, fmt.Errorf("pendaftaran antrian hanya tersedia pada jam operasional (08:00 - 16:00 WIB)")
+	}
+
+	hasActive, err := s.repo.HasActiveAntrianToday(req.NIK, tanggal)
+	if err != nil {
+		return nil, fmt.Errorf("gagal memeriksa antrian aktif: %w", err)
+	}
+	if hasActive {
+		return nil, fmt.Errorf("Anda sudah memiliki antrian aktif pada hari ini")
+	}
+
+	if req.DokterID != nil {
+		tanggalStr := tanggal.Format("2006-01-02")
+		docStatus, err := s.repo.GetDoctorStatusOnDate(*req.DokterID, tanggalStr)
+		if err != nil {
+			return nil, fmt.Errorf("gagal memeriksa status dokter: %w", err)
+		}
+		if docStatus != "hadir" {
+			return nil, fmt.Errorf("dokter tidak tersedia pada tanggal tersebut (status: %s)", docStatus)
+		}
+		remaining, err := s.repo.GetRemainingQuotaOnDate(*req.DokterID, tanggalStr)
+		if err != nil {
+			return nil, fmt.Errorf("gagal memeriksa sisa kuota dokter: %w", err)
+		}
+		if remaining <= 0 {
+			return nil, fmt.Errorf("kuota pendaftaran dokter tersebut pada tanggal ini sudah habis")
+		}
+	}
+
 	var polyName string
 	var kodePoli string = "A"
 	polis, _ := s.repo.FetchPoliklinik()
@@ -300,6 +336,24 @@ func (s *antrianService) GetRiwayatAntrian(nik string) ([]response.AntrianRespon
 func (s *antrianService) CreateBpjsAntrian(req request.BpjsAntrianRequest) (*response.AntrianResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	nowWIB := time.Now().In(loc)
+	if nowWIB.Weekday() == time.Sunday {
+		return nil, fmt.Errorf("pendaftaran antrian tidak tersedia pada hari Minggu")
+	}
+	bpjsHour := nowWIB.Hour()
+	if bpjsHour < 8 || bpjsHour >= 16 {
+		return nil, fmt.Errorf("pendaftaran antrian hanya tersedia pada jam operasional (08:00 - 16:00 WIB)")
+	}
+
+	hasActiveBpjs, errCheck := s.repo.HasActiveAntrianToday(req.NIK, time.Now())
+	if errCheck != nil {
+		return nil, fmt.Errorf("gagal memeriksa antrian aktif: %w", errCheck)
+	}
+	if hasActiveBpjs {
+		return nil, fmt.Errorf("Anda sudah memiliki antrian aktif pada hari ini")
+	}
 
 	const bpjsApiKey = ""
 	const bpjsApiUrl = ""

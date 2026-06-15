@@ -4,8 +4,11 @@ import 'package:giliranku/core/models/pasienModel.dart';
 class PasienRepository {
   static final ApiDataSource _api = ApiDataSource();
 
-  Future<PasienModel?> login(String nik, String name) =>
-      _api.loginPasien(nik, name);
+  Future<PasienModel?> login(String username, String password) =>
+      _api.loginPasien(username, password);
+
+  Future<PasienModel?> register(Map<String, dynamic> data) =>
+      _api.registerPasien(data);
 
   Future<PasienModel?> getProfile(String nik) => _api.getProfile(nik);
 

@@ -86,3 +86,21 @@ func (r *PoliRepository) Delete(id int) error {
 	_, err := r.DB.Exec(query, id)
 	return err
 }
+
+func (r *PoliRepository) HasDoctors(id int) (bool, error) {
+	var count int
+	err := r.DB.QueryRow(`SELECT COUNT(*) FROM category WHERE "IdPoli" = $1 AND app = 1`, id).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *PoliRepository) HasAntrian(id int) (bool, error) {
+	var count int
+	err := r.DB.QueryRow(`SELECT COUNT(*) FROM antrian WHERE poli_id = $1`, id).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

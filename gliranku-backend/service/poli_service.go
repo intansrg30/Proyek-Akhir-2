@@ -58,6 +58,22 @@ func (s *PoliService) Delete(id int) error {
 		return fmt.Errorf("poliklinik dengan ID %d tidak ditemukan", id)
 	}
 
+	hasDoctors, err := s.PoliRepo.HasDoctors(id)
+	if err != nil {
+		return fmt.Errorf("gagal memeriksa data dokter: %w", err)
+	}
+	if hasDoctors {
+		return fmt.Errorf("poliklinik tidak dapat dihapus karena masih memiliki dokter terdaftar")
+	}
+
+	hasAntrian, err := s.PoliRepo.HasAntrian(id)
+	if err != nil {
+		return fmt.Errorf("gagal memeriksa data antrian: %w", err)
+	}
+	if hasAntrian {
+		return fmt.Errorf("poliklinik tidak dapat dihapus karena masih memiliki data antrian terkait")
+	}
+
 	err = s.PoliRepo.Delete(id)
 	if err != nil {
 		return fmt.Errorf("gagal menghapus poliklinik: %w", err)

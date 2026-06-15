@@ -2,6 +2,7 @@ package controller
 
 import (
 	"gliranku/dto/request"
+	"gliranku/models"
 	"gliranku/repository"
 	"gliranku/service"
 	"gliranku/utils"
@@ -104,4 +105,63 @@ func (ctrl *DokterController) Delete(c *gin.Context) {
 		return
 	}
 	utils.Success(c, http.StatusOK, "Dokter berhasil dihapus", nil)
+}
+
+type statusKhususRequest struct {
+	DokterID    int    `json:"dokter_id" binding:"required"`
+	Tanggal     string `json:"tanggal" binding:"required"`
+	Status      string `json:"status" binding:"required"`
+	Keterangan  string `json:"keterangan"`
+	KuotaCustom *int   `json:"kuota_custom"`
+}
+
+func (ctrl *DokterController) SetStatusKhusus(c *gin.Context) {
+	var req statusKhususRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ValidationError(c, "Data tidak valid", err.Error())
+		return
+	}
+
+	sk := &models.DokterStatusKhusus{
+		DokterID:    req.DokterID,
+		Tanggal:     req.Tanggal,
+		Status:      req.Status,
+		Keterangan:  req.Keterangan,
+		KuotaCustom: req.KuotaCustom,
+	}
+
+	if err := ctrl.Service.SaveStatusKhusus(sk); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, "Status kehadiran berhasil disimpan", sk)
+}
+
+func (ctrl *DokterController) GetStatusKhusus(c *gin.Context) {
+	dokterID, err := strconv.Atoi(c.Param("dokter_id"))
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, "ID dokter tidak valid")
+		return
+	}
+
+	results, err := ctrl.Service.GetStatusKhusus(dokterID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, "Gagal mengambil status kehadiran")
+		return
+	}
+	utils.Success(c, http.StatusOK, "Data status kehadiran berhasil diambil", results)
+}
+
+func (ctrl *DokterController) DeleteStatusKhusus(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, "ID tidak valid")
+		return
+	}
+
+	if err := ctrl.Service.DeleteStatusKhusus(id); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, "Status kehadiran berhasil dihapus", nil)
 }

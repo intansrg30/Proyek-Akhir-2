@@ -41,13 +41,13 @@ class ApiDataSource {
     authToken = token;
   }
 
-  Future<PasienModel?> loginPasien(String nik, String name) async {
+  Future<PasienModel?> loginPasien(String username, String password) async {
     try {
       final res = await _client
           .post(
             _uri(ApiConstants.pasienLogin),
             headers: _jsonHeaders,
-            body: jsonEncode({'nik': nik, 'name': name}),
+            body: jsonEncode({'username': username, 'password': password}),
           )
           .timeout(_timeout);
       final body = jsonDecode(res.body) as Map<String, dynamic>;
@@ -67,6 +67,35 @@ class ApiDataSource {
       );
     } catch (e) {
       debugPrint('ApiDataSource.loginPasien: $e');
+      return null;
+    }
+  }
+
+  Future<PasienModel?> registerPasien(Map<String, dynamic> data) async {
+    try {
+      final res = await _client
+          .post(
+            _uri(ApiConstants.pasienRegister),
+            headers: _jsonHeaders,
+            body: jsonEncode(data),
+          )
+          .timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 201) {
+        final resData = body['data'] as Map<String, dynamic>;
+        if (resData['token'] != null) {
+          setToken(resData['token'] as String);
+          return PasienModel.fromJson(resData['patient'] as Map<String, dynamic>);
+        }
+        return PasienModel.fromJson(resData);
+      }
+      return PasienModel(
+        nik: '',
+        name: '',
+        phone: body['message'] as String? ?? 'Registrasi gagal',
+      );
+    } catch (e) {
+      debugPrint('ApiDataSource.registerPasien: $e');
       return null;
     }
   }
@@ -536,5 +565,59 @@ class ApiDataSource {
       debugPrint('ApiDataSource.fetchKunjunganStats: $e');
     }
     return [];
+  }
+
+  Future<Map<String, dynamic>?> setDokterStatusKhusus(Map<String, dynamic> data) async {
+    try {
+      final res = await _client
+          .post(
+            _uri(ApiConstants.dokterStatusKhusus),
+            headers: _jsonHeaders,
+            body: jsonEncode(data),
+          )
+          .timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 200) {
+        return body['data'] as Map<String, dynamic>?;
+      }
+      return {'error': body['message'] ?? 'Gagal menyimpan status'};
+    } catch (e) {
+      debugPrint('ApiDataSource.setDokterStatusKhusus: $e');
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getDokterStatusKhusus(int dokterID) async {
+    try {
+      final res = await _client
+          .get(
+            _uri('${ApiConstants.dokterStatusKhusus}/$dokterID'),
+            headers: _jsonHeaders,
+          )
+          .timeout(_timeout);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        return ((body['data'] as List<dynamic>?) ?? [])
+            .cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      debugPrint('ApiDataSource.getDokterStatusKhusus: $e');
+    }
+    return [];
+  }
+
+  Future<bool> deleteDokterStatusKhusus(int id) async {
+    try {
+      final res = await _client
+          .delete(
+            _uri('${ApiConstants.dokterStatusKhusus}/$id'),
+            headers: _jsonHeaders,
+          )
+          .timeout(_timeout);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('ApiDataSource.deleteDokterStatusKhusus: $e');
+      return false;
+    }
   }
 }

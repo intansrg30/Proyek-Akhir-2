@@ -36,6 +36,9 @@ func SetupMasterRoutes(r *gin.Engine, poliCtrl *controller.PoliController, dokte
 		dokter.POST("", dokterCtrl.Create)
 		dokter.PUT("/:id", dokterCtrl.Update)
 		dokter.DELETE("/:id", dokterCtrl.Delete)
+		dokter.POST("/status-khusus", dokterCtrl.SetStatusKhusus)
+		dokter.GET("/status-khusus/:dokter_id", dokterCtrl.GetStatusKhusus)
+		dokter.DELETE("/status-khusus/:id", dokterCtrl.DeleteStatusKhusus)
 	}
 
 	spesialis := api.Group("/spesialis")
