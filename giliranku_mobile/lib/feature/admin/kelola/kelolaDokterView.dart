@@ -787,7 +787,25 @@ class _StatusKhususDialogState extends State<_StatusKhususDialog> {
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: () => Navigator.pop(ctx, true),
+              onPressed: () {
+                if (selectedStatus != 'hadir') {
+                  if (jamMulai == null || jamSelesai == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Jam Mulai dan Jam Selesai wajib diisi'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+                  final mulaiMins = jamMulai!.hour * 60 + jamMulai!.minute;
+                  final selesaiMins = jamSelesai!.hour * 60 + jamSelesai!.minute;
+                  if (selesaiMins <= mulaiMins) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Jam Selesai harus lebih besar dari Jam Mulai'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+                }
+                Navigator.pop(ctx, true);
+              },
               child: const Text('Simpan'),
             ),
           ],
