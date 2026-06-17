@@ -12,6 +12,7 @@ import (
 
 type AntrianRepository interface {
 	FetchPoliklinik() ([]models.Poliklinik, error)
+	FetchAvailablePoliklinik(tanggal string) ([]models.Poliklinik, error)
 	CheckNIK(nik string) (*models.Pasien, error)
 	CheckNameCaseInsensitive(name string) (*models.Pasien, error)
 	GetLastQueueNumberPoli(poliID int, tanggal time.Time) (int, error)
@@ -43,6 +44,47 @@ func NewAntrianRepository(db *sql.DB) AntrianRepository {
 func (r *antrianRepository) FetchPoliklinik() ([]models.Poliklinik, error) {
 	rows, err := r.db.Query(
 		`SELECT "IdPoli", "NamaPoli", "KodePoli" FROM tbpoli ORDER BY "NamaPoli"`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []models.Poliklinik
+	for rows.Next() {
+		var p models.Poliklinik
+		if err := rows.Scan(&p.PolyID, &p.PolyName, &p.KodePoli); err != nil {
+			continue
+		}
+		p.IsActive = true
+		result = append(result, p)
+	}
+	return result, nil
+}
+
+func (r *antrianRepository) FetchAvailablePoliklinik(tanggal string) ([]models.Poliklinik, error) {
+	query := `
+		SELECT DISTINCT p."IdPoli", p."NamaPoli", p."KodePoli"
+		FROM tbpoli p
+		WHERE EXISTS (
+			SELECT 1 FROM category c
+			LEFT JOIN status_dokter sk ON sk.dokter_id = c.id AND sk.tanggal = $1::date
+			WHERE c."IdPoli" = p."IdPoli" AND c.app = 1
+			AND COALESCE(sk.status, 'hadir') = 'hadir'
+			AND (
+				(EXTRACT(ISODOW FROM $1::date) = 1 AND COALESCE(c.senin, '') != '') OR
+				(EXTRACT(ISODOW FROM $1::date) = 2 AND COALESCE(c.selasa, '') != '') OR
+				(EXTRACT(ISODOW FROM $1::date) = 3 AND COALESCE(c.rabu, '') != '') OR
+				(EXTRACT(ISODOW FROM $1::date) = 4 AND COALESCE(c.kamis, '') != '') OR
+				(EXTRACT(ISODOW FROM $1::date) = 5 AND COALESCE(c.jumat, '') != '') OR
+				(EXTRACT(ISODOW FROM $1::date) = 6 AND COALESCE(c.sabtu, '') != '') OR
+				(EXTRACT(ISODOW FROM $1::date) = 7 AND COALESCE(c.minggu, '') != '') OR
+				sk.id IS NOT NULL
+			)
+			AND (COALESCE(sk.kuota_custom, c."KuotaNonJKN", 30) - (SELECT COUNT(*) FROM antrian a WHERE a.dokter_id = c.id AND DATE(a.tanggal) = $1::date AND a.status != 'dibatalkan')) > 0
+		)
+		ORDER BY p."NamaPoli"
+	`
+	rows, err := r.db.Query(query, tanggal)
 	if err != nil {
 		return nil, err
 	}

@@ -92,7 +92,7 @@ class _AntrianViewState extends State<AntrianView>
   late Animation<double> _fadeAnim;
 
   bool _isLoading = false;
-  bool _isLoadingLayanan = true;
+  bool _isLoadingLayanan = false;
   bool _isLoadingDokter = false;
   bool _isPasienLama = false;
 
@@ -132,7 +132,7 @@ class _AntrianViewState extends State<AntrianView>
       }
     }
 
-    _loadLayanan();
+    _fadeCtrl.forward();
   }
 
   @override
@@ -145,15 +145,23 @@ class _AntrianViewState extends State<AntrianView>
     super.dispose();
   }
 
-  Future<void> _loadLayanan() async {
+  Future<void> _loadLayanan(String tanggal) async {
+    setState(() {
+      _isLoadingLayanan = true;
+      _selectedPoliID = null;
+      _selectedPoliNama = '';
+      _selectedDokterID = null;
+      _selectedDokterNama = '';
+      _dokterList = [];
+      _layananList = [];
+    });
     try {
-      final list = await _api.fetchPoliklinik();
+      final list = await _api.fetchAvailableLayanan(tanggal);
       if (!mounted) return;
       setState(() {
         _layananList = list.map((e) => JenisLayanan.fromJson(e)).toList();
         _isLoadingLayanan = false;
       });
-      _fadeCtrl.forward();
     } catch (e) {
       setState(() => _isLoadingLayanan = false);
       _showSnack('Gagal memuat layanan: $e');
@@ -161,9 +169,8 @@ class _AntrianViewState extends State<AntrianView>
   }
 
   Future<void> _onRefresh() async {
-    await _loadLayanan();
-    if (_selectedPoliID != null && _tanggalCtrl.text.isNotEmpty) {
-      await _loadDokter(_selectedPoliID!, _tanggalCtrl.text);
+    if (_tanggalCtrl.text.isNotEmpty) {
+      await _loadLayanan(_tanggalCtrl.text);
     }
   }
 
@@ -318,6 +325,7 @@ class _AntrianViewState extends State<AntrianView>
       initialDate: now,
       firstDate: now,
       lastDate: now.add(const Duration(days: 30)),
+      selectableDayPredicate: (day) => day.weekday != DateTime.sunday,
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
@@ -329,14 +337,12 @@ class _AntrianViewState extends State<AntrianView>
       ),
     );
     if (picked != null) {
+      final tanggalStr = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
       setState(() {
-        _tanggalCtrl.text =
-            '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+        _tanggalCtrl.text = tanggalStr;
         _tanggalError = null;
       });
-      if (_selectedPoliID != null) {
-        _loadDokter(_selectedPoliID!, _tanggalCtrl.text);
-      }
+      _loadLayanan(tanggalStr);
     }
   }
 
@@ -364,9 +370,7 @@ class _AntrianViewState extends State<AntrianView>
               title: 'Antrian Umum RSUD Porsea',
             ),
             Expanded(
-              child: _isLoadingLayanan
-                  ? _buildShimmer()
-                  : FadeTransition(
+              child: FadeTransition(
                       opacity: _fadeAnim,
                       child: RefreshIndicator(
                         onRefresh: _onRefresh,
@@ -500,7 +504,15 @@ class _AntrianViewState extends State<AntrianView>
           const SizedBox(height: 20),
 
           _label('Pilihan Poliklinik'),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
+          if (_tanggalCtrl.text.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Menampilkan poli yang tersedia pada tanggal ini',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+              ),
+            ),
           _buildDropdownPoli(),
           const SizedBox(height: 16),
 
@@ -655,6 +667,79 @@ class _AntrianViewState extends State<AntrianView>
   }
 
   Widget _buildDropdownPoli() {
+    if (_tanggalCtrl.text.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.calendar_today_outlined,
+                color: Color(0xFFD1D5DB), size: 20),
+            SizedBox(width: 12),
+            Text('Pilih tanggal kunjungan terlebih dahulu',
+                style: TextStyle(
+                    color: Color(0xFFBFC5CF), fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
+    if (_isLoadingLayanan) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Color(0xFF0D9B86)),
+            ),
+            SizedBox(width: 12),
+            Text('Memuat data poliklinik...',
+                style: TextStyle(
+                    color: Color(0xFF9CA3AF), fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
+    if (_layananList.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFCD34D), width: 1.5),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: Color(0xFFD97706), size: 20),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Tidak ada poliklinik tersedia pada tanggal ini.',
+                style: TextStyle(
+                    color: Color(0xFF92400E),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFF9FAFB),

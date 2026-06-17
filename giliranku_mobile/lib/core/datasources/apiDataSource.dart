@@ -430,6 +430,23 @@ class ApiDataSource {
     ];
   }
 
+  Future<List<Map<String, dynamic>>> fetchAvailableLayanan(String tanggal) async {
+    try {
+      final res = await _client
+          .get(_uri('/antrian/layanan?tanggal=$tanggal'))
+          .timeout(_timeout);
+      if (res.statusCode == 200) {
+        return ((jsonDecode(res.body) as Map<String, dynamic>)['data']
+                    as List<dynamic>? ??
+                [])
+            .cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      debugPrint('ApiDataSource.fetchAvailableLayanan: $e');
+    }
+    return [];
+  }
+
   Future<Map<String, dynamic>> cekNIK(String nik) async {
     try {
       final res = await _client

@@ -17,6 +17,7 @@ import (
 
 type AntrianService interface {
 	GetPoliklinik() ([]response.LayananResponse, error)
+	GetAvailablePoliklinik(tanggal string) ([]response.LayananResponse, error)
 	VerifyNIK(nik string) (*response.CekNIKResponse, error)
 	CreateAntrian(req request.AntrianRequest) (*response.AntrianResponse, error)
 	GetDashboardStats() (int, int, int, error)
@@ -41,6 +42,21 @@ func NewAntrianService(repo repository.AntrianRepository) AntrianService {
 
 func (s *antrianService) GetPoliklinik() ([]response.LayananResponse, error) {
 	polis, err := s.repo.FetchPoliklinik()
+	if err != nil {
+		return nil, err
+	}
+	var result []response.LayananResponse
+	for _, p := range polis {
+		result = append(result, response.LayananResponse{
+			ID:   p.PolyID,
+			Nama: p.PolyName,
+		})
+	}
+	return result, nil
+}
+
+func (s *antrianService) GetAvailablePoliklinik(tanggal string) ([]response.LayananResponse, error) {
+	polis, err := s.repo.FetchAvailablePoliklinik(tanggal)
 	if err != nil {
 		return nil, err
 	}
@@ -507,8 +523,6 @@ func (s *antrianService) CreateBpjsAntrian(req request.BpjsAntrianRequest) (*res
 	if hasActiveBpjs {
 		return nil, fmt.Errorf("Anda sudah mengambil antrian ke poli ini pada hari ini")
 	}
-
-	// tanggal is already defined above
 
 	lastGlobal, err := s.repo.GetLastQueueNumberGlobal(tanggal)
 	if err != nil {

@@ -23,7 +23,17 @@ func NewAntrianController(svc service.AntrianService) *AntrianController {
 }
 
 func (c *AntrianController) GetLayanan(ctx *gin.Context) {
-	data, err := c.service.GetPoliklinik()
+	tanggal := ctx.Query("tanggal")
+
+	var data interface{}
+	var err error
+
+	if tanggal != "" {
+		data, err = c.service.GetAvailablePoliklinik(tanggal)
+	} else {
+		data, err = c.service.GetPoliklinik()
+	}
+
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
