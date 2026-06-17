@@ -505,14 +505,6 @@ class _AntrianViewState extends State<AntrianView>
 
           _label('Pilihan Poliklinik'),
           const SizedBox(height: 4),
-          if (_tanggalCtrl.text.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                'Menampilkan poli yang tersedia pada tanggal ini',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
-              ),
-            ),
           _buildDropdownPoli(),
           const SizedBox(height: 16),
 

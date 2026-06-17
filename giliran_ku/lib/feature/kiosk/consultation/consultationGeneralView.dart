@@ -104,9 +104,14 @@ class _ConsultationGeneralViewState extends State<ConsultationGeneralView> {
     setState(() {
       _loadingLayanan = true;
       _error = null;
+      _polis = [];
+      _selectedPoli = null;
+      _doctors = [];
+      _selectedDoctor = null;
     });
     try {
-      final polis = await _controller.fetchPoliList();
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      final polis = await _controller.fetchPoliList(tanggal: today);
       if (!mounted) return;
       setState(() {
         _polis = polis;
@@ -593,6 +598,27 @@ class _ConsultationGeneralViewState extends State<ConsultationGeneralView> {
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: CircularProgressIndicator(color: _primary),
+              ),
+            )
+          else if (_polis.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_outlined,
+                      color: Colors.orange, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tidak ada poliklinik tersedia hari ini.',
+                      style: TextStyle(color: Colors.orange, fontSize: 13),
+                    ),
+                  ),
+                ],
               ),
             )
           else

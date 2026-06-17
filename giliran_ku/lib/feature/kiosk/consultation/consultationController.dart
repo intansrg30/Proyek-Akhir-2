@@ -33,8 +33,8 @@ class ConsultationController {
     return _api.validateNik(nik);
   }
 
-  Future<List<Poli>> fetchPoliList() {
-    return _api.getPoliList();
+  Future<List<Poli>> fetchPoliList({String? tanggal}) {
+    return _api.getPoliList(tanggal: tanggal);
   }
 
   Future<List<Doctor>> fetchDoctors(String poliId, String date) {

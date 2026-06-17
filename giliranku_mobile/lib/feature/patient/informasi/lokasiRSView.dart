@@ -3,13 +3,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:location/location.dart' as loc;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:giliranku/core/theme/theme.dart';
 
-const double _hospitalLat = 2.4449;
-const double _hospitalLng = 99.1481;
+const double _hospitalLat = 2.4340809;
+const double _hospitalLng = 99.156413;
 final LatLng _hospitalLatLng = LatLng(_hospitalLat, _hospitalLng);
 
 class LokasiRSView extends StatefulWidget {
@@ -29,7 +29,7 @@ class LokasiRSView extends StatefulWidget {
 class _LokasiRSViewState extends State<LokasiRSView> {
   final MapController _mapController = MapController();
 
-  loc.LocationData? _userLocation;
+  Position? _userPosition;
   String _userAddress = 'Mengambil lokasi...';
   String _distanceText = '-';
   bool _locationLoading = true;
@@ -53,51 +53,69 @@ class _LokasiRSViewState extends State<LokasiRSView> {
       _locationDenied = false;
     });
 
-    final locationService = loc.Location();
-
-    bool serviceEnabled = await locationService.serviceEnabled();
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      serviceEnabled = await locationService.requestService();
-      if (!serviceEnabled) {
-        if (mounted) setState(() => _locationDenied = true);
+      if (mounted) {
+        setState(() {
+          _locationDenied = true;
+          _locationLoading = false;
+        });
+      }
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          setState(() {
+            _locationDenied = true;
+            _locationLoading = false;
+          });
+        }
         return;
       }
     }
 
-    loc.PermissionStatus permission = await locationService.hasPermission();
-    if (permission == loc.PermissionStatus.denied) {
-      permission = await locationService.requestPermission();
-      if (permission != loc.PermissionStatus.granted) {
-        if (mounted) setState(() => _locationDenied = true);
-        return;
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        setState(() {
+          _locationDenied = true;
+          _locationLoading = false;
+        });
       }
+      return;
     }
 
-    final locationData = await locationService.getLocation();
+    final position = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 10),
+      ),
+    );
+
     if (!mounted) return;
-
-    _userLocation = locationData;
+    _userPosition = position;
 
     final dist = _haversineDistance(
-      locationData.latitude ?? 0,
-      locationData.longitude ?? 0,
+      position.latitude,
+      position.longitude,
       _hospitalLat,
       _hospitalLng,
     );
 
-    final address = await _reverseGeocode(
-      locationData.latitude ?? 0,
-      locationData.longitude ?? 0,
-    );
-
-    if (!mounted) return;
     setState(() {
       _distanceText = '${dist.toStringAsFixed(1)} km';
-      _userAddress = address;
       _locationLoading = false;
+      _userAddress = 'Mengambil alamat...';
     });
 
-    _fitBounds(locationData);
+    _fitBounds(position);
+
+    final address = await _reverseGeocode(position.latitude, position.longitude);
+    if (!mounted) return;
+    setState(() => _userAddress = address);
   }
 
   double _haversineDistance(
@@ -132,9 +150,8 @@ class _LokasiRSViewState extends State<LokasiRSView> {
     return 'Tidak dapat mengambil alamat';
   }
 
-  void _fitBounds(loc.LocationData userLocation) {
-    if (userLocation.latitude == null || userLocation.longitude == null) return;
-    final userLatLng = LatLng(userLocation.latitude!, userLocation.longitude!);
+  void _fitBounds(Position userPosition) {
+    final userLatLng = LatLng(userPosition.latitude, userPosition.longitude);
 
     final bounds = LatLngBounds(userLatLng, _hospitalLatLng);
     _mapController.fitCamera(
@@ -146,25 +163,41 @@ class _LokasiRSViewState extends State<LokasiRSView> {
   }
 
   void _recenter() {
-    final locData = _userLocation;
-    if (locData == null || locData.latitude == null) return;
+    final pos = _userPosition;
+    if (pos == null) return;
     _mapController.move(
-      LatLng(locData.latitude!, locData.longitude!),
+      LatLng(pos.latitude, pos.longitude),
       15,
     );
   }
 
   Future<void> _openDirections() async {
-    final locData = _userLocation;
-    String url;
-    if (locData != null && locData.latitude != null) {
-      url =
-          'https://www.google.com/maps/dir/?api=1&origin=${locData.latitude},${locData.longitude}&destination=$_hospitalLat,$_hospitalLng&travelmode=driving';
+    final pos = _userPosition;
+    Uri uri;
+
+    if (pos != null) {
+      uri = Uri.parse(
+        'google.navigation:q=$_hospitalLat,$_hospitalLng&mode=d',
+      );
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      uri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1'
+        '&origin=${pos.latitude},${pos.longitude}'
+        '&destination=$_hospitalLat,$_hospitalLng'
+        '&travelmode=driving',
+      );
     } else {
-      url =
-          'https://www.google.com/maps/dir/?api=1&destination=$_hospitalLat,$_hospitalLng&travelmode=driving';
+      uri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1'
+        '&destination=$_hospitalLat,$_hospitalLng'
+        '&travelmode=driving',
+      );
     }
-    final uri = Uri.parse(url);
+
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -188,11 +221,11 @@ class _LokasiRSViewState extends State<LokasiRSView> {
       ),
     ];
 
-    final locData = _userLocation;
-    if (locData != null && locData.latitude != null) {
+    final pos = _userPosition;
+    if (pos != null) {
       markers.add(
         Marker(
-          point: LatLng(locData.latitude!, locData.longitude!),
+          point: LatLng(pos.latitude, pos.longitude),
           width: 48,
           height: 48,
           child: const Tooltip(
@@ -558,10 +591,10 @@ class _LokasiRSViewState extends State<LokasiRSView> {
   }
 
   String _estimateDriveTime() {
-    final locData = _userLocation;
-    if (locData == null || locData.latitude == null) return '-';
+    final pos = _userPosition;
+    if (pos == null) return '-';
     final dist = _haversineDistance(
-        locData.latitude!, locData.longitude!, _hospitalLat, _hospitalLng);
+        pos.latitude, pos.longitude, _hospitalLat, _hospitalLng);
     final minutes = (dist / 40 * 60).round();
     if (minutes < 60) return '$minutes mnt';
     return '${(minutes / 60).floor()} jam ${minutes % 60} mnt';

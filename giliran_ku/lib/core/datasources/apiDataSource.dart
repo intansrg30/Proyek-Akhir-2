@@ -36,8 +36,11 @@ class QueueApi {
     );
   }
 
-  Future<List<Poli>> getPoliList() async {
-    final payload = await _get('/antrian/layanan');
+  Future<List<Poli>> getPoliList({String? tanggal}) async {
+    final payload = await _get(
+      '/antrian/layanan',
+      queryParameters: tanggal != null ? {'tanggal': tanggal} : null,
+    );
     final data = _dataList(payload);
     return data
         .map((item) => Poli(
